@@ -135,11 +135,6 @@ class DatePicker extends \yii\base\Widget
     protected function renderCom()
     {
 
-        if (isset($this->form) && ($this->type !== self::TYPE_RANGE)) {
-            $vars = call_user_func('get_object_vars', $this);
-            unset($vars['form']);
-            return $this->form->field($this->model, $this->attribute)->widget(self::classname(), $vars);
-        }
         return $this->parseMarkup($this->getDiv('textInput'));
     }
     /**
@@ -163,9 +158,12 @@ class DatePicker extends \yii\base\Widget
     }
     protected function hashPluginOptions($name)
     {
-        $this->_encOptions = empty($this->pluginOptions) ? '' : Json::encode($this->pluginOptions);
+        $this->_encOptions = empty($this->pluginOptions) ? '{ singleDatePicker: true }' : Json::encode($this->pluginOptions);
+        if ($this->type == self::TYPE_DEFAULT) {
+            $this->_encOptions = "{ singleDatePicker: true ,  language : 'zh-CN'}"; //初始化时 避免为空情况 json push
+        }
         $this->_hashVar = $name. '_' . hash('crc32', $this->_encOptions);
-        $this->options['data-plugin-name'] = $name;
+        $this->options['data-plugin-name']    = $name;
         $this->options['data-plugin-options'] = $this->_hashVar;
     }
 
@@ -197,7 +195,7 @@ class DatePicker extends \yii\base\Widget
         if ($this->pluginOptions !== false) {
             $this->registerPluginOptions($name, View::POS_HEAD);
             if ($this->type == self::TYPE_RANGE ) {
-                if($init != null){
+                if ($init != null) {
                 $initExp = "$('#{$this->options['id']} .startDate').html('{$init['startDate']}');"
                 . "$('#{$this->options['id']} .endDate').html('{$init['endDate']}');"
                 . "$('#{$this->options['id']} .separator').html('{$init['separator']}');";
@@ -209,15 +207,29 @@ class DatePicker extends \yii\base\Widget
                     . "$('#{$this->options['id']} .endDate').html('{$end}');"
                     . "$('#{$this->options['id']} .separator').html(' - ');";
                 }
-            }
-            $initExp = new JsExpression($initExp);
-            if ($callbackCon == null) {
+               if ($callbackCon == null) {
                     $callbackCon = "function(start, end, label) {
                     $('#{$this->options['id']} .startDate').html(start.format('YYYY-MM-DD'));"
                     . "$('#{$this->options['id']} .endDate').html(end.format('YYYY-MM-DD'));"
                     . "$('#{$this->options['id']} .separator').html('{$init['separator']}');"
                     . "}";
+                }
+            } else {
+                if($init != null){
+                $initExp = "$('#{$this->options['id']} .date').html('{$init['startDate']}');";
+                }  else {
+                    $start = date("Y-m-d");
+                    $init = "$('#{$this->options['id']} .date').html('{$start}');";
+                }
+                if ($callbackCon == null) {
+                    $callbackCon = "function(start,end, label) {
+                    $('#{$this->options['id']} .date').html(start.format('YYYY-MM-DD'));"
+                    . "}";
+                }
             }
+
+            $initExp = new JsExpression($initExp);
+            
             $callbackCon = new JsExpression($callbackCon);
             $script = $initExp."{$id}.{$name}({$this->_hashVar}, {$callbackCon});";
             if ($callback != null) {
@@ -232,7 +244,7 @@ class DatePicker extends \yii\base\Widget
                 $js[] = "{$id}.on('{$event}.daterangepicker', {$function});";
             }
             $js = implode("\n", $js);
-            $view->registerJs($js);
+            $view->registerJs($js, View::POS_READY);
         }
     }
     /**
@@ -243,6 +255,7 @@ class DatePicker extends \yii\base\Widget
      */
     protected function parseMarkup($input)
     {
+        if ($this->type == self::TYPE_RANGE ) {
         $this->_container = $this->options;
         Html::addCssClass($this->_container, 'pull-right');
         Html::addCssStyle($this->_container, "background: #fff; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc");
@@ -250,6 +263,15 @@ class DatePicker extends \yii\base\Widget
         return Html::tag('div', "<i class='glyphicon glyphicon-calendar fa fa-calendar'></i>"
         . "<span class='startDate'></span>"
         . "<span class='separator'></span><span class='endDate'></span><b class='caret'></b>", $this->_container);
+        }
+        if ($this->type == self::TYPE_DEFAULT ) {
+            $this->_container = $this->options;
+            Html::addCssClass($this->_container, 'pull-right');
+            Html::addCssStyle($this->_container, "background: #fff; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc");
+
+            return Html::tag('div', "<i class='glyphicon glyphicon-calendar fa fa-calendar'></i>"
+            . "<span class='date'></span>", $this->_container);
+        }
     }
     /**
      * Automatically convert the date format from PHP DateTime to Javascript DateTime format
@@ -310,9 +332,9 @@ class DatePicker extends \yii\base\Widget
             DatePickerAsset::register($view);
         }
         $id = "$('#" . $this->options['id'] . "')";
-        if ($this->type === self::TYPE_RANGE) {
+//        if ($this->type === self::TYPE_RANGE) {
             $this->registerPlugin('daterangepicker',null,null,'');
             DatePickerAsset::register($view);
-        }
+//        }
     }
 }
